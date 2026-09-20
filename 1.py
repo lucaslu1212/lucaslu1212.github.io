@@ -18,6 +18,17 @@ class HTTPRequestTool:
         left_frame = ttk.LabelFrame(main_frame, text="请求设置", padding="10")
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
+        # 学生身份码（一键替换）
+        ttk.Label(left_frame, text="学生身份码 (一键替换所有位置):").pack(anchor=tk.W)
+        id_frame = ttk.Frame(left_frame)
+        id_frame.pack(fill=tk.X, pady=(0, 10))
+        self.student_id_var = tk.StringVar(value="f5fd4e9a-2b03-433d-8c49-0732270562aa")
+        ttk.Entry(id_frame, textvariable=self.student_id_var, width=40).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Button(id_frame, text="替换", command=self.replace_student_id).pack(side=tk.LEFT, padx=(5, 0))
+        
+        # 存储当前学生ID
+        self.current_student_id = "f5fd4e9a-2b03-433d-8c49-0732270562aa"
+        
         # 请求网址
         ttk.Label(left_frame, text="请求网址:").pack(anchor=tk.W)
         self.url_var = tk.StringVar(value="http://10.136.120.100:3000/api/students/f5fd4e9a-2b03-433d-8c49-0732270562aa/points")
@@ -101,6 +112,32 @@ class HTTPRequestTool:
                 key, value = line.split(":", 1)
                 headers[key.strip()] = value.strip()
         return headers
+    
+    def replace_student_id(self):
+        """一键替换所有位置的学生身份码"""
+        new_id = self.student_id_var.get().strip()
+        if not new_id:
+            messagebox.showerror("错误", "请输入学生身份码")
+            return
+        
+        old_id = self.current_student_id
+        
+        # 替换URL中的ID
+        url = self.url_var.get()
+        if old_id in url:
+            url = url.replace(old_id, new_id)
+            self.url_var.set(url)
+        
+        # 替换请求标头中的ID（如果有的话）
+        headers = self.headers_text.get("1.0", tk.END)
+        if old_id in headers:
+            headers = headers.replace(old_id, new_id)
+            self.headers_text.delete("1.0", tk.END)
+            self.headers_text.insert(tk.END, headers)
+        
+        # 更新当前ID
+        self.current_student_id = new_id
+        messagebox.showinfo("成功", f"已将学生身份码替换为:\n{new_id}")
     
     def send_request(self):
         """发送请求"""
