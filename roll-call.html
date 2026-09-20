@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>课堂点名</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: #0f1923;
+    color: #e8eaf0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    user-select: none;
+  }
+
+  /* 顶部标题 */
+  .header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    color: #f0c96a;
+  }
+  .header .subtitle {
+    font-size: 13px;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+
+  /* 班级选择区 */
+  .class-panel {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: #1a2535;
+    border: 1px solid #2a3a50;
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 700px;
+    flex-wrap: wrap;
+  }
+  .class-panel label {
+    font-size: 13px;
+    color: #9ca3af;
+    white-space: nowrap;
+  }
+  .class-panel select {
+    background: #0f1923;
+    color: #e8eaf0;
+    border: 1px solid #2a3a50;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+  }
+  .class-panel select:focus { border-color: #f0c96a; }
+  .class-panel .student-count {
+    font-size: 12px;
+    color: #6b7280;
+    margin-left: auto;
+  }
+
+  /* 主舞台 */
+  .stage {
+    width: 100%;
+    max-width: 700px;
+    background: #1a2535;
+    border: 1px solid #2a3a50;
+    border-radius: 20px;
+    padding: 32px 24px;
+    text-align: center;
+    margin-bottom: 20px;
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  /* 闲置状态 */
+  .idle-hint {
+    font-size: 15px;
+    color: #4b5563;
+  }
+
+  /* 滚动点名名字 */
+  .rolling-name {
+    font-size: 72px;
+    font-weight: 500;
+    letter-spacing: 6px;
+    color: #f0c96a;
+    min-height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.05s;
+  }
+  .rolling-name.fast { opacity: 0.7; }
+
+  /* 停止后显示学生信息 */
+  .result-name {
+    font-size: 64px;
+    font-weight: 500;
+    color: #f0c96a;
+    letter-spacing: 4px;
+    animation: popIn 0.3s ease;
+  }
+  .result-meta {
+    font-size: 14px;
+    color: #9ca3af;
+    margin-top: 10px;
+  }
+  .result-meta span {
+    margin: 0 8px;
+  }
+  .result-points-badge {
+    display: inline-block;
+    background: #1f3a28;
+    color: #4ade80;
+    border: 1px solid #22c55e;
+    border-radius: 20px;
+    padding: 2px 12px;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0.7); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* 操作按钮区 */
+  .btn-group {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 700px;
+  }
+  .btn {
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    outline: none;
+    transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: 1px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+  .btn-start {
+    background: #f0c96a;
+    color: #0f1923;
+    flex: 1;
+    min-width: 160px;
+  }
+  .btn-add {
+    background: #22c55e;
+    color: #fff;
+    flex: 1;
+    min-width: 140px;
+  }
+  .btn-skip {
+    background: #374151;
+    color: #e8eaf0;
+    flex: 1;
+    min-width: 120px;
+  }
+
+  /* 积分输入 */
+  .points-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 16px;
+    width: 100%;
+    max-width: 700px;
+  }
+  .points-row label { font-size: 13px; color: #9ca3af; }
+  .points-row input[type="number"] {
+    width: 80px;
+    background: #0f1923;
+    color: #f0c96a;
+    border: 1px solid #2a3a50;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 15px;
+    text-align: center;
+    outline: none;
+  }
+  .points-row input[type="number"]:focus { border-color: #f0c96a; }
+
+  /* 底部：历史记录 + 剩余名单 */
+  .bottom-row {
+    display: flex;
+    gap: 16px;
+    width: 100%;
+    max-width: 700px;
+  }
+  .panel {
+    flex: 1;
+    background: #1a2535;
+    border: 1px solid #2a3a50;
+    border-radius: 12px;
+    padding: 14px 16px;
+    min-width: 0;
+  }
+  .panel-title {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .history-list, .remain-list {
+    list-style: none;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .history-list::-webkit-scrollbar,
+  .remain-list::-webkit-scrollbar { width: 4px; }
+  .history-list::-webkit-scrollbar-thumb,
+  .remain-list::-webkit-scrollbar-thumb { background: #2a3a50; border-radius: 2px; }
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #1e2d3d;
+    font-size: 13px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-item .hi-name { color: #e8eaf0; }
+  .history-item .hi-pts { color: #4ade80; font-size: 12px; }
+  .history-item .hi-none { color: #4b5563; font-size: 12px; }
+  .remain-item {
+    display: inline-block;
+    background: #0f1923;
+    color: #9ca3af;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 12px;
+    margin: 3px;
+  }
+  .empty-hint { font-size: 12px; color: #374151; }
+
+  /* 进度条 */
+  .progress-bar {
+    width: 100%;
+    max-width: 700px;
+    height: 4px;
+    background: #1a2535;
+    border-radius: 2px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: #f0c96a;
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  /* toast 提示 */
+  #toast {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-60px);
+    background: #22c55e;
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 10px;
+    font-size: 14px;
+    transition: transform 0.3s;
+    z-index: 999;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.error { background: #ef4444; }
+
+  /* 已全部点完提示 */
+  .all-done {
+    font-size: 18px;
+    color: #22c55e;
+    animation: popIn 0.3s ease;
+  }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<div class="header">
+  <h1>课 堂 点 名</h1>
+  <div class="subtitle" id="subtitle">请选择班级后开始点名</div>
+</div>
+
+<!-- 班级选择 -->
+<div class="class-panel">
+  <label>年级</label>
+  <select id="gradeSelect" onchange="onGradeChange()">
+    <option value="">加载中…</option>
+  </select>
+  <label>班级</label>
+  <select id="classSelect" onchange="onClassChange()">
+    <option value="">请先选年级</option>
+  </select>
+  <span class="student-count" id="studentCount">共 0 人</span>
+</div>
+
+<!-- 进度条 -->
+<div class="progress-bar">
+  <div class="progress-fill" id="progressFill" style="width:0%"></div>
+</div>
+
+<!-- 主舞台 -->
+<div class="stage" id="stage">
+  <div class="idle-hint" id="idleHint">选择班级后，点击「开始点名」</div>
+  <div class="rolling-name" id="rollingName" style="display:none"></div>
+  <div id="resultBox" style="display:none">
+    <div class="result-name" id="resultName"></div>
+    <div class="result-meta" id="resultMeta"></div>
+    <div id="pointsBadge" style="display:none" class="result-points-badge"></div>
+  </div>
+  <div class="all-done" id="allDone" style="display:none">🎉 本班学生已全部点完！</div>
+</div>
+
+<!-- 积分设置 -->
+<div class="points-row" id="pointsRow">
+  <label>加分值</label>
+  <input type="number" id="pointsInput" value="50" min="1" max="100">
+  <label style="color:#6b7280;font-size:12px">分（点击"加分"后立即生效）</label>
+</div>
+
+<!-- 操作按钮 -->
+<div class="btn-group">
+  <button class="btn btn-start" id="btnStart" onclick="startRoll()" disabled>开始点名</button>
+  <button class="btn btn-add" id="btnAdd" onclick="addPoints()" style="display:none">✓ 加  分</button>
+  <button class="btn btn-skip" id="btnSkip" onclick="skipStudent()" style="display:none">跳  过</button>
+</div>
+
+<!-- 历史 + 剩余 -->
+<div class="bottom-row">
+  <div class="panel">
+    <div class="panel-title">本次点名记录</div>
+    <ul class="history-list" id="historyList">
+      <li class="empty-hint">暂无记录</li>
+    </ul>
+  </div>
+  <div class="panel">
+    <div class="panel-title">剩余未点学生</div>
+    <div id="remainBox"><span class="empty-hint">请先选择班级</span></div>
+  </div>
+</div>
+
+<script>
+// ─── 状态 ────────────────────────────────────────────────────────────────────
+const BASE = window.location.origin; // 自动适配服务器地址
+let allStudents = [];
+let pool = [];        // 当前班级未点名的学生
+let called = [];      // 已点名记录 [{student, points}]
+let current = null;   // 当前被点到的学生
+let rolling = false;
+let rollTimer = null;
+
+// ─── 初始化：加载年级班级 ────────────────────────────────────────────────────
+async function init() {
+  try {
+    const [settingsRes, studentsRes] = await Promise.all([
+      fetch(BASE + '/api/settings'),
+      fetch(BASE + '/api/students')
+    ]);
+    const settings = await settingsRes.json();
+    allStudents = await studentsRes.json();
+
+    const gradeSelect = document.getElementById('gradeSelect');
+    gradeSelect.innerHTML = '<option value="">请选择年级</option>';
+    const grades = settings.grades || [];
+    grades.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g; opt.textContent = g;
+      gradeSelect.appendChild(opt);
+    });
+  } catch(e) {
+    showToast('连接服务器失败，请确认系统已启动', true);
+    document.getElementById('subtitle').textContent = '无法连接到课堂系统';
+  }
+}
+
+// ─── 年级切换 ────────────────────────────────────────────────────────────────
+function onGradeChange() {
+  const grade = document.getElementById('gradeSelect').value;
+  const classSelect = document.getElementById('classSelect');
+  classSelect.innerHTML = '<option value="">请选择班级</option>';
+
+  if (!grade) return;
+
+  // 从学生数据中获取该年级的班级列表
+  const classes = [...new Set(
+    allStudents.filter(s => s.grade === grade).map(s => s.className)
+  )].sort();
+
+  if (classes.length === 0) {
+    classSelect.innerHTML = '<option value="">该年级暂无学生</option>';
+    return;
+  }
+  classes.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c + '班';
+    classSelect.appendChild(opt);
+  });
+  onClassChange();
+}
+
+// ─── 班级切换 ────────────────────────────────────────────────────────────────
+function onClassChange() {
+  const grade = document.getElementById('gradeSelect').value;
+  const cls = document.getElementById('classSelect').value;
+
+  if (!grade || !cls) {
+    document.getElementById('studentCount').textContent = '共 0 人';
+    document.getElementById('btnStart').disabled = true;
+    return;
+  }
+
+  // 重置状态
+  pool = allStudents.filter(s => s.grade === grade && s.className === cls).map(s => ({...s}));
+  called = [];
+  current = null;
+  renderHistory();
+  renderRemain();
+  updateProgress();
+
+  document.getElementById('studentCount').textContent = `共 ${pool.length} 人`;
+  document.getElementById('btnStart').disabled = pool.length === 0;
+  document.getElementById('btnStart').textContent = '开始点名';
+  document.getElementById('btnAdd').style.display = 'none';
+  document.getElementById('btnSkip').style.display = 'none';
+  document.getElementById('idleHint').style.display = 'flex';
+  document.getElementById('rollingName').style.display = 'none';
+  document.getElementById('resultBox').style.display = 'none';
+  document.getElementById('allDone').style.display = 'none';
+  document.getElementById('pointsBadge').style.display = 'none';
+  document.getElementById('subtitle').textContent = `${grade} ${cls}班 · ${pool.length}人`;
+}
+
+// ─── 开始点名 ────────────────────────────────────────────────────────────────
+function startRoll() {
+  if (rolling) return;
+  if (pool.length === 0) {
+    showToast('该班级已全部点完！', false);
+    return;
+  }
+
+  current = null;
+  rolling = true;
+
+  document.getElementById('idleHint').style.display = 'none';
+  document.getElementById('resultBox').style.display = 'none';
+  document.getElementById('allDone').style.display = 'none';
+  document.getElementById('rollingName').style.display = 'flex';
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnAdd').style.display = 'none';
+  document.getElementById('btnSkip').style.display = 'none';
+  document.getElementById('pointsBadge').style.display = 'none';
+
+  // 滚动动画：先快后慢
+  let elapsed = 0;
+  const totalTime = 1800 + Math.random() * 800; // 1.8~2.6秒
+  const rollingEl = document.getElementById('rollingName');
+
+  function tick() {
+    if (elapsed >= totalTime) {
+      // 停止：随机选一个
+      const idx = Math.floor(Math.random() * pool.length);
+      current = pool.splice(idx, 1)[0];
+      rolling = false;
+      showResult(current);
+      return;
+    }
+    // 随机显示一个名字
+    const r = pool[Math.floor(Math.random() * pool.length)];
+    rollingEl.textContent = r.name;
+    rollingEl.className = 'rolling-name' + (elapsed < totalTime * 0.6 ? ' fast' : '');
+    // 动态间隔：前60%快，后40%越来越慢
+    const progress = elapsed / totalTime;
+    const interval = progress < 0.6
+      ? 60 + Math.random() * 40
+      : 80 + (progress - 0.6) * 800 + Math.random() * 80;
+    elapsed += interval;
+    rollTimer = setTimeout(tick, interval);
+  }
+  tick();
+}
+
+// ─── 展示结果 ────────────────────────────────────────────────────────────────
+function showResult(student) {
+  document.getElementById('rollingName').style.display = 'none';
+  document.getElementById('resultBox').style.display = 'block';
+  document.getElementById('resultName').textContent = student.name;
+  document.getElementById('resultMeta').innerHTML =
+    `<span>${student.grade}</span><span>${student.className}班</span><span>当前积分：${student.points || 0} 分</span>`;
+  document.getElementById('pointsBadge').style.display = 'none';
+
+  // 显示操作按钮
+  document.getElementById('btnAdd').style.display = 'flex';
+  document.getElementById('btnSkip').style.display = 'flex';
+  document.getElementById('btnStart').disabled = pool.length === 0;
+  document.getElementById('btnStart').textContent = pool.length > 0 ? '继续点名' : '已全部点完';
+
+  renderRemain();
+  updateProgress();
+}
+
+// ─── 加积分 ──────────────────────────────────────────────────────────────────
+async function addPoints() {
+  if (!current) return;
+  const delta = parseInt(document.getElementById('pointsInput').value) || 50;
+  if (delta <= 0 || delta > 100) { showToast('加分值需在 1-100 之间', true); return; }
+
+  document.getElementById('btnAdd').disabled = true;
+  document.getElementById('btnSkip').disabled = true;
+
+  try {
+    const res = await fetch(`${BASE}/api/students/${current.id}/points`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delta, reason: '课堂点名奖励' })
+    });
+    if (!res.ok) throw new Error();
+    const updated = await res.json();
+    current.points = updated.points;
+
+    // 显示徽章
+    const badge = document.getElementById('pointsBadge');
+    badge.textContent = `+${delta} 分  →  共 ${updated.points} 分`;
+    badge.style.display = 'inline-block';
+
+    // 记录历史
+    called.push({ student: current, points: delta });
+    renderHistory();
+    showToast(`已给 ${current.name} 加 ${delta} 分`);
+  } catch(e) {
+    showToast('加分失败，请检查服务器连接', true);
+    document.getElementById('btnAdd').disabled = false;
+    document.getElementById('btnSkip').disabled = false;
+    return;
+  }
+
+  // 加分后隐藏按钮
+  finishCurrent();
+}
+
+// ─── 跳过（不加分）─────────────────────────────────────────────────────────
+function skipStudent() {
+  if (!current) return;
+  called.push({ student: current, points: 0 });
+  renderHistory();
+  showToast(`已跳过 ${current.name}`);
+  finishCurrent();
+}
+
+// ─── 完成当前学生 ────────────────────────────────────────────────────────────
+function finishCurrent() {
+  document.getElementById('btnAdd').style.display = 'none';
+  document.getElementById('btnSkip').style.display = 'none';
+  document.getElementById('btnAdd').disabled = false;
+  document.getElementById('btnSkip').disabled = false;
+
+  if (pool.length === 0) {
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStart').textContent = '已全部点完';
+    document.getElementById('allDone').style.display = 'block';
+    document.getElementById('resultBox').style.display = 'none';
+    document.getElementById('subtitle').textContent = '本班学生已全部点完 🎉';
+  }
+  current = null;
+  renderRemain();
+  updateProgress();
+}
+
+// ─── 渲染历史记录 ────────────────────────────────────────────────────────────
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (called.length === 0) {
+    list.innerHTML = '<li class="empty-hint">暂无记录</li>';
+    return;
+  }
+  list.innerHTML = [...called].reverse().map(r => `
+    <li class="history-item">
+      <span class="hi-name">${r.student.name}</span>
+      ${r.points > 0
+        ? `<span class="hi-pts">+${r.points} 分</span>`
+        : `<span class="hi-none">未加分</span>`}
+    </li>
+  `).join('');
+}
+
+// ─── 渲染剩余学生 ────────────────────────────────────────────────────────────
+function renderRemain() {
+  const box = document.getElementById('remainBox');
+  if (pool.length === 0) {
+    box.innerHTML = '<span class="empty-hint">全部已点</span>';
+    return;
+  }
+  box.innerHTML = pool.map(s =>
+    `<span class="remain-item">${s.name}</span>`
+  ).join('');
+}
+
+// ─── 进度条 ──────────────────────────────────────────────────────────────────
+function updateProgress() {
+  const grade = document.getElementById('gradeSelect').value;
+  const cls = document.getElementById('classSelect').value;
+  if (!grade || !cls) return;
+  const total = allStudents.filter(s => s.grade === grade && s.className === cls).length;
+  const done = called.length;
+  const pct = total > 0 ? (done / total * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+// ─── Toast 提示 ──────────────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isError ? ' error' : '');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 2200);
+}
+
+// ─── 启动 ────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
