@@ -20,12 +20,12 @@ class HTTPRequestTool:
         
         # 请求网址
         ttk.Label(left_frame, text="请求网址:").pack(anchor=tk.W)
-        self.url_var = tk.StringVar()
+        self.url_var = tk.StringVar(value="http://10.136.120.100:3000/api/students/f5fd4e9a-2b03-433d-8c49-0732270562aa/points")
         ttk.Entry(left_frame, textvariable=self.url_var, width=50).pack(fill=tk.X, pady=(0, 10))
         
         # 请求方法
         ttk.Label(left_frame, text="请求方法:").pack(anchor=tk.W)
-        self.method_var = tk.StringVar(value="GET")
+        self.method_var = tk.StringVar(value="POST")
         method_combo = ttk.Combobox(left_frame, textvariable=self.method_var, 
                                      values=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"], state="readonly")
         method_combo.pack(fill=tk.X, pady=(0, 10))
@@ -34,12 +34,13 @@ class HTTPRequestTool:
         ttk.Label(left_frame, text="请求体 (Payload):").pack(anchor=tk.W)
         self.payload_text = scrolledtext.ScrolledText(left_frame, height=8, width=50)
         self.payload_text.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        self.payload_text.insert(tk.END, '{"delta":99,"reason":"课堂点名奖励"}')
         
         # 请求标头
         ttk.Label(left_frame, text="请求标头 (每行一个 Header: Name: Value):").pack(anchor=tk.W)
         self.headers_text = scrolledtext.ScrolledText(left_frame, height=8, width=50)
         self.headers_text.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
-        self.headers_text.insert(tk.END, "Accept: */*\nUser-Agent: Mozilla/5.0\nContent-Type: application/json")
+        self.headers_text.insert(tk.END, "Accept: */*\nAccept-Encoding: gzip, deflate\nAccept-Language: zh-CN,zh;q=0.9\nConnection: keep-alive\nContent-Type: application/json\nHost: 10.136.120.100:3000\nOrigin: http://10.136.120.100:3000\nReferer: http://10.136.120.100:3000/roll-call.html\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36")
         
         # 右侧 - 循环设置和响应
         right_frame = ttk.Frame(main_frame)
@@ -50,11 +51,11 @@ class HTTPRequestTool:
         loop_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Label(loop_frame, text="循环次数:").pack(anchor=tk.W)
-        self.loop_count_var = tk.StringVar(value="1")
+        self.loop_count_var = tk.StringVar(value="100")
         ttk.Entry(loop_frame, textvariable=self.loop_count_var, width=10).pack(anchor=tk.W, pady=(0, 5))
         
         ttk.Label(loop_frame, text="间隔时间 (秒):").pack(anchor=tk.W)
-        self.interval_var = tk.StringVar(value="1")
+        self.interval_var = tk.StringVar(value="0.1")
         ttk.Entry(loop_frame, textvariable=self.interval_var, width=10).pack(anchor=tk.W, pady=(0, 5))
         
         # 按钮
