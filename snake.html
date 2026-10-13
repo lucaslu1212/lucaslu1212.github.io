@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI 贪吃蛇</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1a2a3a, #0d1b2a); font-family: "Microsoft YaHei", sans-serif; color: #cfe8ff;
+  }
+  #wrap { display: flex; gap: 20px; align-items: flex-start; }
+  canvas {
+    background: #101c2c; border-radius: 12px; border: 2px solid #2c4a6e;
+    box-shadow: 0 0 30px rgba(44, 120, 200, .35);
+  }
+  #panel {
+    width: 230px; background: rgba(20, 35, 55, .9); border-radius: 12px;
+    padding: 18px; border: 1px solid #2c4a6e;
+  }
+  h1 { font-size: 20px; margin-bottom: 14px; color: #7fd4ff; text-align: center; }
+  .stat { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
+  .stat b { color: #ffd166; }
+  label { display: block; margin: 14px 0 6px; font-size: 13px; }
+  input[type=range] { width: 100%; }
+  button {
+    width: 100%; margin-top: 10px; padding: 9px; border: none; border-radius: 8px;
+    background: #2c6e9e; color: #fff; font-size: 14px; cursor: pointer; transition: background .2s;
+  }
+  button:hover { background: #3a86bd; }
+  button.alt { background: #4a5e75; }
+  button.alt:hover { background: #5d7590; }
+  .tip { margin-top: 14px; font-size: 12px; color: #8fb3d0; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="board" width="400" height="400"></canvas>
+  <div id="panel">
+    <h1>AI 贪吃蛇</h1>
+    <div class="stat"><span>得分</span><b id="score">0</b></div>
+    <div class="stat"><span>长度</span><b id="len">3</b></div>
+    <div class="stat"><span>步数</span><b id="steps">0</b></div>
+    <div class="stat"><span>状态</span><b id="state">运行中</b></div>
+    <label>速度：<span id="speedVal">60ms</span></label>
+    <input type="range" id="speed" min="10" max="300" step="10" value="60">
+    <label><input type="checkbox" id="showPath" checked> 显示 AI 寻路路径</label>
+    <button id="btnMode">模式：AI 自动</button>
+    <button id="btnPause">暂停（空格）</button>
+    <button id="btnReset" class="alt">重新开始（R）</button>
+    <p class="tip">AI 使用 BFS 寻路，并模拟验证吃完食物后不会困死自己；无法安全吃食物时会跟随自己的尾巴保命。手动模式用方向键控制。</p>
+  </div>
+</div>
+
+<script>
+const COLS = 20, ROWS = 20, CELL = 20;
+const DIRS = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+const cv = document.getElementById('board'), ctx = cv.getContext('2d');
+
+let snake, dir, food, score, steps, dead, paused, mode = 'ai', path = [], timer = null;
+let speed = 60, showPath = true;
+
+const key = p => p.x + ',' + p.y;
+const inGrid = p => p.x >= 0 && p.x < COLS && p.y >= 0 && p.y < ROWS;
+
+function init() {
+  snake = [{x:9,y:10},{x:8,y:10},{x:7,y:10}];
+  dir = {x:1,y:0}; score = 0; steps = 0; dead = false; paused = false; path = [];
+  spawnFood();
+  updateStats(); draw();
+}
+
+function spawnFood() {
+  const taken = new Set(snake.map(key));
+  const free = [];
+  for (let x = 0; x < COLS; x++)
+    for (let y = 0; y < ROWS; y++)
+      if (!taken.has(x + ',' + y)) free.push({x, y});
+  food = free.length ? free[Math.floor(Math.random() * free.length)] : null; // null = 全满获胜
+}
+
+// ---------------- 寻路与安全判断 ----------------
+
+function bfs(start, goal, blocked) {
+  const prev = new Map(); prev.set(key(start), null);
+  const q = [start];
+  while (q.length) {
+    const cur = q.shift();
+    if (cur.x === goal.x && cur.y === goal.y) {
+      const res = []; let n = cur;
+      while (n) { res.unshift(n); n = prev.get(key(n)); }
+      return res;
+    }
+    for (const d of DIRS) {
+      const np = {x: cur.x + d.x, y: cur.y + d.y}, k = key(np);
+      if (!inGrid(np) || prev.has(k) || blocked.has(k)) continue;
+      prev.set(k, cur); q.push(np);
+    }
+  }
+  return null;
+}
+
+function floodArea(start, blocked) {
+  const seen = new Set([key(start)]), q = [start];
+  while (q.length) {
+    const cur = q.shift();
+    for (const d of DIRS) {
+      const np = {x: cur.x + d.x, y: cur.y + d.y}, k = key(np);
+      if (!inGrid(np) || seen.has(k) || blocked.has(k)) continue;
+      seen.add(k); q.push(np);
+    }
+  }
+  return seen.size;
+}
+
+// 模拟沿路径吃到食物后，判断是否仍能到达自己的尾巴（即没有被困死）
+function safeAfter(pathToFood) {
+  const s = snake.map(o => ({x:o.x, y:o.y}));
+  for (let i = 1; i < pathToFood.length; i++) {
+    s.unshift({x: pathToFood[i].x, y: pathToFood[i].y});
+    if (!(pathToFood[i].x === food.x && pathToFood[i].y === food.y)) s.pop();
+  }
+  const blocked = new Set(s.slice(0, -1).map(key)); // 尾巴会移动，不计入障碍
+  const area = floodArea(s[0], blocked);
+  return area >= s.length && bfs(s[0], s[s.length - 1], blocked) !== null;
+}
+
+function aiNext() {
+  const head = snake[0];
+  const blocked = new Set(snake.slice(0, -1).map(key)); // 尾巴格子允许进入
+  if (food) {
+    const p = bfs(head, food, blocked);
+    if (p && p.length > 1 && safeAfter(p)) return {dir: {x:p[1].x-head.x, y:p[1].y-head.y}, p};
+  }
+  // 保命策略：跟随自己的尾巴
+  const tail = snake[snake.length - 1];
+  const pt = bfs(head, tail, blocked);
+  if (pt && pt.length > 1) return {dir: {x:pt[1].x-head.x, y:pt[1].y-head.y}, p: pt};
+  // 走投无路：随便走一步能活的
+  for (const d of DIRS) {
+    const np = {x: head.x + d.x, y: head.y + d.y};
+    if (inGrid(np) && !blocked.has(key(np))) return {dir: d, p: null};
+  }
+  return null;
+}
+
+// ---------------- 游戏主循环 ----------------
+
+function step() {
+  if (paused || dead) return;
+  path = [];
+  if (mode === 'ai') {
+    const r = aiNext();
+    if (!r) { dead = true; updateStats(); draw(); return; }
+    dir = r.dir; path = r.p || [];
+  }
+  const nh = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+  const hitBody = snake.some((s, i) => i < snake.length - 1 && s.x === nh.x && s.y === nh.y);
+  if (!inGrid(nh) || hitBody) {
+    dead = true;
+  } else {
+    snake.unshift(nh); steps++;
+    if (food && nh.x === food.x && nh.y === food.y) { score += 10; spawnFood(); }
+    else snake.pop();
+    if (!food) { dead = true; score += 100; } // 全满：通关
+  }
+  updateStats(); draw();
+}
+
+function updateStats() {
+  document.getElementById('score').textContent = score;
+  document.getElementById('len').textContent = snake.length;
+  document.getElementById('steps').textContent = steps;
+  document.getElementById('state').textContent =
+    dead ? (food ? '游戏结束' : '🎉 通关！') : (paused ? '已暂停' : '运行中');
+  document.getElementById('state').style.color = dead ? '#ff6b6b' : '#7fff9e';
+}
+
+// ---------------- 绘制 ----------------
+
+function draw() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  // 网格
+  ctx.strokeStyle = 'rgba(80,120,160,.15)';
+  for (let i = 1; i < COLS; i++) {
+    ctx.beginPath(); ctx.moveTo(i*CELL, 0); ctx.lineTo(i*CELL, cv.height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i*CELL); ctx.lineTo(cv.width, i*CELL); ctx.stroke();
+  }
+  // 寻路路径
+  if (showPath && path.length > 1) {
+    ctx.strokeStyle = 'rgba(127,212,255,.5)'; ctx.lineWidth = 2; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(snake[0].x*CELL+CELL/2, snake[0].y*CELL+CELL/2);
+    for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x*CELL+CELL/2, path[i].y*CELL+CELL/2);
+    ctx.stroke(); ctx.setLineDash([]); ctx.lineWidth = 1;
+  }
+  // 食物
+  if (food) {
+    ctx.fillStyle = '#ff5252';
+    ctx.beginPath();
+    ctx.arc(food.x*CELL+CELL/2, food.y*CELL+CELL/2, CELL/2-4, 0, Math.PI*2);
+    ctx.fill();
+  }
+  // 蛇
+  snake.forEach((s, i) => {
+    const t = i / Math.max(snake.length - 1, 1);
+    ctx.fillStyle = i === 0 ? '#7fd4ff' : `rgb(${80-30*t}, ${200-120*t}, ${150+60*t})`;
+    ctx.fillRect(s.x*CELL+1, s.y*CELL+1, CELL-2, CELL-2);
+  });
+  // 覆盖层
+  if (dead || paused) {
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+    ctx.font = 'bold 26px Microsoft YaHei';
+    ctx.fillText(dead ? (food ? '游戏结束' : '🎉 通关！') : '已暂停', cv.width/2, cv.height/2 - 8);
+    ctx.font = '14px Microsoft YaHei'; ctx.fillStyle = '#aacbe8';
+    ctx.fillText(dead ? '按 R 重新开始' : '按 空格 继续', cv.width/2, cv.height/2 + 22);
+  }
+}
+
+// ---------------- 控制 ----------------
+
+function restartTimer() {
+  clearInterval(timer);
+  timer = setInterval(step, speed);
+}
+
+document.getElementById('speed').addEventListener('input', e => {
+  speed = 310 - e.target.value;                 // 滑块越大越快
+  document.getElementById('speedVal').textContent = speed + 'ms';
+  restartTimer();
+});
+document.getElementById('showPath').addEventListener('change', e => {
+  showPath = e.target.checked; draw();
+});
+document.getElementById('btnPause').addEventListener('click', () => {
+  if (!dead) { paused = !paused; updateStats(); draw(); }
+});
+document.getElementById('btnReset').addEventListener('click', init);
+document.getElementById('btnMode').addEventListener('click', e => {
+  mode = mode === 'ai' ? 'manual' : 'ai';
+  e.target.textContent = '模式：' + (mode === 'ai' ? 'AI 自动' : '手动');
+  init();
+});
+document.addEventListener('keydown', e => {
+  const map = {ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1}, ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0}};
+  if (map[e.key]) {
+    e.preventDefault();
+    if (mode === 'manual') {
+      const d = map[e.key];
+      if (d.x !== -dir.x || d.y !== -dir.y) dir = d;   // 禁止直接掉头
+    }
+  } else if (e.code === 'Space') {
+    e.preventDefault();
+    if (!dead) { paused = !paused; updateStats(); draw(); }
+  } else if (e.key === 'r' || e.key === 'R') {
+    init();
+  }
+});
+
+document.getElementById('speedVal').textContent = speed + 'ms';
+init();
+restartTimer();
+</script>
+</body>
+</html>
